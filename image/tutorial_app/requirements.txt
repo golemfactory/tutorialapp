@@ -1,0 +1,4 @@
+--extra-index-url https://builds.golem.network
+golem_task_api==0.15.2
+dataclasses; python_version < '3.7'
+async_generator; python_version < '3.7'
