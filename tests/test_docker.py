@@ -83,11 +83,10 @@ class TestDocker(SimulationBase):
 
     @classmethod
     def setup_class(cls):
-        pass
-        # docker.from_env().images.build(
-        #     path=str(Path(__file__).parent.parent / 'image'),
-        #     tag=TAG,
-        # )
+        docker.from_env().images.build(
+            path=str(Path(__file__).parent.parent / 'image'),
+            tag=TAG,
+        )
 
     def _get_task_api_service(
             self,
