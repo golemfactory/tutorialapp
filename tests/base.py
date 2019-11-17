@@ -1,9 +1,5 @@
 import abc
 import asyncio
-import contextlib
-import os
-import socket
-import time
 
 from pathlib import Path
 from typing import List
@@ -11,17 +7,16 @@ from typing import List
 import pytest
 
 from golem_task_api import TaskApiService
-from golem_task_api.client import ShutdownException
 from golem_task_api.testutils import TaskLifecycleUtil
 
 
 @pytest.fixture
 def task_lifecycle_util(tmpdir):
-    print('workdir:', tmpdir)
     return TaskLifecycleUtil(Path(tmpdir))
 
 
 class SimulationBase(abc.ABC):
+
     @abc.abstractmethod
     def _get_task_api_service(
             self,
@@ -30,12 +25,10 @@ class SimulationBase(abc.ABC):
         pass
 
     @staticmethod
-    def _get_task_params(
-            subtasks_count: int = 1,
+    def _get_app_params(
             difficulty: int = 10,
     ):
         return {
-            "subtasks_count": subtasks_count,
             "difficulty": difficulty,
             "resources": [
                 "task.input",
@@ -50,28 +43,21 @@ class SimulationBase(abc.ABC):
     def _check_results(
             req_task_outputs_dir: Path,
     ) -> None:
-        contents = os.listdir(req_task_outputs_dir)
-        assert len(contents) > 0
+        assert len(list(req_task_outputs_dir.iterdir())) > 0
 
     async def _simulate_task(
             self,
             max_subtasks_count: int,
             task_params: dict,
             task_lifecycle_util: TaskLifecycleUtil,
-            interruptible: bool = False,
     ):
-        try:
-            await task_lifecycle_util.simulate_task(
-                self._get_task_api_service,
-                max_subtasks_count,
-                task_params,
-                self._get_task_resources(),
-            )
-        except Exception as exc:
-            if not interruptible:
-                raise
-        else:
-            self._check_results(task_lifecycle_util.req_subtask_outputs_dir)
+        task_dir = await task_lifecycle_util.simulate_task(
+            self._get_task_api_service,
+            max_subtasks_count,
+            task_params,
+            self._get_task_resources(),
+        )
+        self._check_results(task_dir.task_outputs_dir)
 
     @pytest.mark.asyncio
     async def test_discard(
@@ -79,25 +65,28 @@ class SimulationBase(abc.ABC):
             task_lifecycle_util: TaskLifecycleUtil,
     ):
         max_subtasks_count = 4
-        task_params = self._get_task_params(subtasks_count=4)
+        app_params = self._get_app_params()
 
         async with task_lifecycle_util.init_requestor(
                 self._get_task_api_service) as requestor_client:
 
-            task_id = 'test_discard_task_id123'
+            task_id = '0xf00f'
+            opaque_node_id = '0xd00d'
+
             await task_lifecycle_util.create_task(
                 task_id,
                 max_subtasks_count,
                 self._get_task_resources(),
-                task_params,
-            )
+                app_params)
+
             task_lifecycle_util.init_provider(
                 self._get_task_api_service,
-                task_id,
-            )
-            subtask_ids = await task_lifecycle_util.compute_remaining_subtasks(
                 task_id)
-            self._check_results(task_lifecycle_util.req_task_outputs_dir)
+            subtask_ids = await task_lifecycle_util.compute_remaining_subtasks(
+                task_id,
+                opaque_node_id)
+            task_dir = task_lifecycle_util.req_dir.task_dir(task_id)
+            self._check_results(task_dir.task_outputs_dir)
 
             # Discard all
             discarded_subtask_ids = await requestor_client.discard_subtasks(
@@ -106,8 +95,9 @@ class SimulationBase(abc.ABC):
             assert discarded_subtask_ids == subtask_ids
             assert await requestor_client.has_pending_subtasks(task_id)
             subtask_ids = await task_lifecycle_util.compute_remaining_subtasks(
-                task_id)
-            self._check_results(task_lifecycle_util.req_task_outputs_dir)
+                task_id,
+                opaque_node_id)
+            self._check_results(task_dir.task_outputs_dir)
 
             # Discard single
             discarded_subtask_ids = await requestor_client.discard_subtasks(
@@ -117,11 +107,10 @@ class SimulationBase(abc.ABC):
             assert discarded_subtask_ids == subtask_ids[:1]
             assert await requestor_client.has_pending_subtasks(task_id)
             subtask_ids = await task_lifecycle_util.compute_remaining_subtasks(
-                task_id)
+                task_id,
+                opaque_node_id)
             assert len(subtask_ids) == 1
-            self._check_results(
-                task_lifecycle_util.req_task_outputs_dir,
-            )
+            self._check_results(task_dir.task_outputs_dir)
 
     @pytest.mark.asyncio
     async def test_provider_single_shutdown(self, task_lifecycle_util):
@@ -154,9 +143,8 @@ class SimulationBase(abc.ABC):
 
         benchmark_defer = asyncio.ensure_future(self._simulate_task(
             1,
-            self._get_task_params(difficulty=256),
-            task_lifecycle_util,
-            interruptible=True
+            self._get_app_params(difficulty=256),
+            task_lifecycle_util
         ))
         shutdown_defer = asyncio.ensure_future(_shutdown())
 
@@ -164,3 +152,18 @@ class SimulationBase(abc.ABC):
             [shutdown_defer, benchmark_defer],
             return_when=asyncio.ALL_COMPLETED,
             timeout=5.)
+
+    @pytest.mark.asyncio
+    async def test_requestor_benchmark(self, task_lifecycle_util):
+        async with task_lifecycle_util.init_requestor(
+                self._get_task_api_service):
+            score = await task_lifecycle_util.requestor_client.run_benchmark()
+            assert score > 0
+
+    @pytest.mark.asyncio
+    async def test_provider_benchmark(self, task_lifecycle_util):
+        task_id = '0xf00f'
+        task_lifecycle_util.init_provider(self._get_task_api_service, task_id)
+        await task_lifecycle_util.start_provider()
+        score = await task_lifecycle_util.provider_client.run_benchmark()
+        assert score > 0

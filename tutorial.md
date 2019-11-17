@@ -206,37 +206,37 @@ The `RequestorHandler` is derived from the Task API's `RequestorAppHandler` [LIN
 class RequestorHandler(api.RequestorAppHandler):
     async def create_task(
             self,
-            task_work_dir: Path,
+            work_dir: Path,
             max_subtasks_count: int,
             task_params: dict,
     ) -> None:
-        return await create_task(task_work_dir, max_subtasks_count, task_params)
+        return await create_task(work_dir, max_subtasks_count, task_params)
 
     async def next_subtask(
             self,
-            task_work_dir: Path,
+            work_dir: Path,
     ) -> api.structs.Subtask:
-        return await next_subtask(task_work_dir)
+        return await next_subtask(work_dir)
 
     async def verify(
             self,
-            task_work_dir: Path,
+            work_dir: Path,
             subtask_id: str,
     ) -> Tuple[bool, Optional[str]]:
-        return await verify_subtask(task_work_dir, subtask_id)
+        return await verify_subtask(work_dir, subtask_id)
 
     async def discard_subtasks(
             self,
-            task_work_dir: Path,
+            work_dir: Path,
             subtask_ids: List[str],
     ) -> List[str]:
-        return await discard_subtasks(task_work_dir, subtask_ids)
+        return await discard_subtasks(work_dir, subtask_ids)
 
     async def has_pending_subtasks(
             self,
-            task_work_dir: Path,
+            work_dir: Path,
     ) -> bool:
-        return await has_pending_subtasks(task_work_dir)
+        return await has_pending_subtasks(work_dir)
 
     async def run_benchmark(self, work_dir: Path) -> float:
         return await run_benchmark(work_dir)
@@ -248,11 +248,11 @@ Next, the `ProviderHandler` (Task API's `ProviderAppHandler` [LINK]):
 class ProviderHandler(api.ProviderAppHandler):
     async def compute(
             self,
-            task_work_dir: Path,
+            work_dir: Path,
             subtask_id: str,
             subtask_params: dict,
     ) -> Path:
-        return await compute_subtask(task_work_dir, subtask_id, subtask_params)
+        return await compute_subtask(work_dir, subtask_id, subtask_params)
 
     async def run_benchmark(self, work_dir: Path) -> float:
         return await run_benchmark(work_dir)
@@ -385,14 +385,14 @@ class TaskBase:
         default_factory=dict)
 
     @classmethod
-    def _load(cls, task_work_dir: Path) -> 'TaskBase':
-        file_path = task_work_dir / 'task.json'
+    def _load(cls, work_dir: Path) -> 'TaskBase':
+        file_path = work_dir / 'task.json'
         with open(file_path, 'r') as f:
             state_dict = json.load(f)
         return cls(**state_dict)
 
-    def _save(self, task_work_dir: Path) -> None:
-        file_path = task_work_dir / 'task.json'
+    def _save(self, work_dir: Path) -> None:
+        file_path = work_dir / 'task.json'
         with open(file_path, 'w') as f:
             json.dump(asdict(self), f)
 ```
@@ -513,11 +513,11 @@ Let's go through the commands, one by one.
 
     ```python
     async def create_task(
-            task_work_dir: Path,
+            work_dir: Path,
             max_subtasks_count: int,
             task_params: dict,
     ) -> None:
-        task_inputs_dir = task_work_dir / api.constants.TASK_INPUTS_DIR
+        task_inputs_dir = work_dir / api.constants.TASK_INPUTS_DIR
         # read task parameters
         difficulty = int(task_params['difficulty'])
         subtasks_count = int(task_params['subtasks_count'])
@@ -533,7 +533,7 @@ Let's go through the commands, one by one.
             raise ValueError(f"len(resources)={contents} != 1")
         # create and save the task to the working directory
         Task.create(
-            task_work_dir,
+            work_dir,
             difficulty=difficulty,
             subtasks_count=subtasks_count)
     ```
@@ -542,14 +542,14 @@ Let's go through the commands, one by one.
 
     ```python
     async def next_subtask(
-            task_work_dir: Path,
+            work_dir: Path,
     ) -> api.structs.Subtask:
-        task_inputs_dir = task_work_dir / api.constants.TASK_INPUTS_DIR
-        subtask_inputs_dir = task_work_dir / api.constants.SUBTASK_INPUTS_DIR
+        task_inputs_dir = work_dir / api.constants.TASK_INPUTS_DIR
+        subtask_inputs_dir = work_dir / api.constants.SUBTASK_INPUTS_DIR
         # the task input file is a single resource file provided in create_task
         task_input_file = os.listdir(task_inputs_dir)[0]
 
-        async with Task.lock(task_work_dir) as task:
+        async with Task.lock(work_dir) as task:
             subtask_num = task.next_subtask_num()
             subtask_id = create_subtask_id(subtask_num)
             subtask_input_zip = f'{subtask_id}.zip'
@@ -573,12 +573,12 @@ Let's go through the commands, one by one.
 
     ```python
     async def verify_subtask(
-            task_work_dir: Path,
+            work_dir: Path,
             subtask_id: str,
     ) -> Tuple[bool, Optional[str]]:
-        subtask_inputs_dir = task_work_dir / api.constants.SUBTASK_INPUTS_DIR
-        subtask_outputs_dir = task_work_dir / api.constants.SUBTASK_OUTPUTS_DIR
-        task_outputs_dir = task_work_dir / api.constants.TASK_OUTPUTS_DIR
+        subtask_inputs_dir = work_dir / api.constants.SUBTASK_INPUTS_DIR
+        subtask_outputs_dir = work_dir / api.constants.SUBTASK_OUTPUTS_DIR
+        task_outputs_dir = work_dir / api.constants.TASK_OUTPUTS_DIR
         # read subtask input
         input_data = _read_zip_contents(subtask_inputs_dir / f'{subtask_id}.zip')
         # read subtask (computation) output
@@ -586,7 +586,7 @@ Let's go through the commands, one by one.
         provider_result, provider_nonce = output_data.rsplit(' ', maxsplit=1)
         provider_nonce = int(provider_nonce)
         # verify hash
-        async with Task.lock(task_work_dir) as task:
+        async with Task.lock(work_dir) as task:
             try:
                 proof_of_work.verify(
                     input_data,
@@ -607,10 +607,10 @@ Let's go through the commands, one by one.
 
     ```python
     async def discard_subtasks(
-            task_work_dir: Path,
+            work_dir: Path,
             subtask_ids: List[str],
     ) -> List[str]:
-        async with Task.lock(task_work_dir) as task:
+        async with Task.lock(work_dir) as task:
             for subtask_id in subtask_ids:
                 task.subtask_discarded(subtask_id)
         return subtask_ids
@@ -620,9 +620,9 @@ Let's go through the commands, one by one.
 
     ```python
     async def has_pending_subtasks(
-            task_work_dir: Path,
+            work_dir: Path,
     ) -> bool:
-        async with Task.lock(task_work_dir) as task:
+        async with Task.lock(work_dir) as task:
             return len(task.subtasks_pending)
     ```
 
@@ -630,7 +630,7 @@ Let's go through the commands, one by one.
 
     ```python
     async def run_benchmark(
-            task_work_dir: Path
+            work_dir: Path
     ) -> float:
         return await api.threading.Executor.run(proof_of_work.benchmark)
     ```
@@ -639,7 +639,7 @@ Let's go through the commands, one by one.
 
     ```python
     async def compute_subtask(
-            task_work_dir: Path,
+            work_dir: Path,
             subtask_id: str,
             subtask_params: dict,
     ) -> Path:
@@ -648,8 +648,8 @@ Let's go through the commands, one by one.
         if difficulty < 0:
             raise ValueError(f"difficulty={difficulty}")
         # set up directories
-        subtask_inputs_dir = task_work_dir / api.constants.SUBTASK_INPUTS_DIR
-        subtask_outputs_dir = task_work_dir
+        subtask_inputs_dir = work_dir / api.constants.SUBTASK_INPUTS_DIR
+        subtask_outputs_dir = work_dir
         # read input data
         # FIXME: compute should take a resource list as an argument
         subtask_input_file = subtask_inputs_dir / os.listdir(subtask_inputs_dir)[0]
