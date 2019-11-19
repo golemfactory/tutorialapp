@@ -74,7 +74,7 @@ class RequestorHandler(api.RequestorAppHandler):
     async def abort_subtask(
             self,
             task_work_dir: RequestorTaskDir,
-            subtask_id: str
+            subtask_id: str,
     ) -> None:
         return await abort_subtask(task_work_dir, subtask_id)
 
@@ -90,7 +90,7 @@ class ProviderHandler(api.ProviderAppHandler):
 
     async def run_benchmark(
             self,
-            task_work_dir: Path
+            task_work_dir: Path,
     ) -> float:
         return await run_benchmark()
 

@@ -25,28 +25,28 @@ def _read_zip_contents(path: Path) -> str:
 
 async def create_task(
         work_dir: RequestorTaskDir,
-        max_subtasks_count: int,
+        max_part_count: int,
         task_params: dict,
 ) -> Task:
     # validate the 'difficulty' parameter
     difficulty = int(task_params['difficulty'])
     if difficulty < 0:
         raise ValueError(f"difficulty={difficulty}")
-
+    # check whether resources were provided
+    resources = task_params.get('resources')
+    if not resources:
+        raise ValueError(f"resources={resources}")
     # read the input file
     try:
-        task_input_file = work_dir.task_inputs_dir / task_params['resources'][0]
+        task_input_file = work_dir.task_inputs_dir / resources[0]
         input_data = task_input_file.read_text('utf-8')
     except (IOError, StopIteration) as exc:
-        raise ValueError(
-            f"Invalid resource file: {task_params['resources']}: {exc}")
-
+        raise ValueError(f"Invalid resource file: {resources} ({exc})")
     # create the task
     task_manager = TaskManager(work_dir)
-    task_manager.create_task(max_subtasks_count)
-
+    task_manager.create_task(max_part_count)
     # update the parts with input data
-    for num in range(max_subtasks_count):
+    for num in range(max_part_count):
         part = task_manager.get_part(num)
         part.input_data = input_data + str(uuid.uuid4())
         part.difficulty = difficulty + (difficulty % 2)
