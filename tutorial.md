@@ -10,11 +10,11 @@ Quick links
 
 # Introduction
 
-This section will guide you through the process of creating a sample Golem application. We will work with the `Golem-Task-Api` library to quickly bootstrap the app and implement the required logic.
+This tutorial will guide you through the process of creating a sample Golem application. We will work with the `Golem-Task-Api` library to quickly bootstrap and test our app.
 
 > Note: the `Golem-Task-Api` helper library is currently written in Python (3.6) and serves as a foundation for apps built in that language. The Rust and static binary versions of that library are currently on the roadmap.
 
-The `Tutorial-App` is a simple Proof of Work application. Golem tasks are initialized with a PoW difficulty parameter, set by the application user (requestor). After publishing the task in the network, Golem finds providers that are willing to participate in the computation. Each provider then computes a PoW with the set input difficulty and for different chunks of input data. The results will be sent back to the requestor and verified. For a more detailed description of task's lifecycle in the network, please refer to this section [LINK].
+The `Tutorial-App` is a simple Proof of Work application. Golem tasks are initialized with a PoW difficulty parameter, set by the application user (requestor). After publishing the task in the network, Golem finds providers that are willing to participate in the computation. Each provider then computes a PoW with the set input difficulty and for different chunks of input data. The results will be sent back to the requestor and verified. For a more detailed description of task's lifecycle in the network, please refer to [this section](#application-lifecycle).
 
 The `github` repository for the `Tutorial-App` can be found [here](https://github.com/golemfactory/tutorialapp).
 
@@ -37,7 +37,7 @@ The guide for creating `Tutorial-App` will cover the following aspects of Task A
 
 # Building the `Tutorial-App`
 
-The Task API library provides an out-of-the-box [gRPC](https://grpc.io) server compliant with the [API specification](https://github.com/golemfactory/task-api/README.md). The messages used for the API calls are specified in the [Protocol Buffers](https://developers.google.com/protocol-buffers) format. The Task API library hides these details from developers and requires them only to implement the application logic.
+The Task API library provides an out-of-the-box [gRPC](https://grpc.io) server compliant with the [API specification](https://github.com/golemfactory/task-api/README.md). The messages used for the API calls are specified in the [Protocol Buffers](https://developers.google.com/protocol-buffers) format. The Task API library hides these details from developers and provides a convenient way to implement application's logic.
 
 > The protocol and message definition files can be found [here](https://github.com/golemfactory/task-api/tree/master/golem_task_api/proto).
 
@@ -102,7 +102,7 @@ This file is composed of 2 parts:
 - parsing the `requirements.txt` file
 - calling the `setuptools.setup` function
 
-The `parse_requirements` function converts `pip` requirements file contents to a list that can be understood by the `setup` function. This way there is no need to double the work with specifying the requirements manually. `parse_requirements` is implemented as follows:
+The `parse_requirements` function converts the contents of a `pip` requirements file to a format understood by the `setup` function. This eliminates a need to double the work by specifying the requirements manually. `parse_requirements` is implemented as follows:
 
 ```python
 def parse_requirements(file_name: str = 'requirements.txt') -> List[str]:
@@ -197,7 +197,7 @@ if __name__ == '__main__':
     loop.run_until_complete(main())
 ```
 
-The actual logic for `RequestorHandler` and `ProviderHandler` will be defined elsewhere. These classes are here to satisfy the implementation of the interfaces. This way app implementation is isolated from the bootstrapping code.
+The actual logic for `RequestorHandler` and `ProviderHandler` will be defined elsewhere as these classes are here to satisfy the implementation of the interfaces. By writing our code this way, we isolate the implementation from the bootstrapping code.
 
 The `RequestorHandler` is derived from the Task API's `RequestorAppHandler` and defined as follows:
 
@@ -321,9 +321,9 @@ def compute(
     raise RuntimeError("Solution not found")
 ```
 
-In order not to block the event loop thread, we're going to execute the `compute` function in a dedicated thread. `Executor.is_shutting_down` will signal whether we should stop the iteration, since the result is going to be discarded anyway.
+In order not to block the event loop thread, we're going to execute  `compute` in a dedicated thread. `Executor.is_shutting_down` will signal whether we should stop the iteration, since the result is going to be discarded anyway.
 
-For verification purposes, a hash is computed from the same `input_data` and compared with the resulting hash. Besides that, we check the difficulty threshold:
+For verification purposes, a hash is computed from the same `input_data` and compared with the received hash. Then, we perform a sanity check on the hash difficulty:
 
 ```python
 def verify(
@@ -340,7 +340,7 @@ def verify(
         raise ValueError(f"Invalid result hash difficulty")
 ```
 
-To satisfy the Task API interface, we need to provide a benchmarking function. It will measure the execution time of an arbitrary number of iterations. The result will be converted to an arbitrarily chosen score range.
+To satisfy the Task API interface, we need to provide a benchmarking function. It will measure the execution time of an arbitrary number of iterations. The result will be converted to a fixed score range.
 
 ```python
 def benchmark(
@@ -401,25 +401,7 @@ Tutorial-App
             └── task_manager.py
 ```
 
-The `apputils` package from the Task API library provides out-of-the-box task management and persistence. The `DBTaskManager` class is built on the `peewee` library and uses an SQLite database by default.
-
-For the purpose of this project, we're going to extend the task part model with additional fields.
-
-```python
-from golem_task_api.apputils.task import database
-
-
-class Part(database.Part):
-    input_data = peewee.CharField(null=True)
-    difficulty = peewee.FloatField(null=True)
-
-
-class TaskManager(database.DBTaskManager):
-    def __init__(self, work_dir: Path) -> None:
-        super().__init__(work_dir, part_model=Part)
-```
-
-`DBTaskManager` is based on a concept of:
+The Task API library is equipped with an out-of-the-box task manager. It is based on the following concepts:
 
 - part
 
@@ -438,8 +420,16 @@ class TaskManager(database.DBTaskManager):
     A successful subtask computation concludes the computation of the
     corresponding part.
 
-The `DBTaskManager` class is responsible for correlating subtasks with task parts and
-managing their status. The latter is defined in `golem_task_api.apputils.task` as:
+The included task manager will help you in the following areas:
+
+- splitting the task into parts
+- creating and managing subtasks bound to task parts
+- updating the status of each subtask
+- persisting the state to disk
+
+The default `TaskManager` class is built on the `peewee` library and uses an SQLite database by default.
+
+`SubtaskStatus` is defined in `golem_task_api.apputils.task` as:
 
 ```python
 class SubtaskStatus(enum.Enum):
@@ -450,6 +440,29 @@ class SubtaskStatus(enum.Enum):
     FAILURE = 'failure'
     ABORTED = 'aborted'
 ```
+
+For the purpose of this project, we're going to extend the task part model with additional fields.
+
+```python
+from golem_task_api.apputils.task import database
+
+
+class Part(database.Part):
+    input_data = peewee.CharField(null=True)
+    difficulty = peewee.FloatField(null=True)
+
+
+class TaskManager(database.DBTaskManager):
+    def __init__(self, work_dir: Path) -> None:
+        super().__init__(work_dir, part_model=Part)
+```
+
+We've added two fields to the `Part` model:
+
+- `input_data`, which will be the source data for our PoW compute function
+- `difficulty`, representing the PoW function difficulty threshold
+
+Now we want the `DBTaskManager` to use our `Part` model. We can do that by calling `super().__init__(work_dir, part_model=Part)`.
 
 ### `commands.py`
 
