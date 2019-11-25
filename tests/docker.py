@@ -11,7 +11,7 @@ from golem_task_api import constants, TaskApiService
 def is_docker_available():
     try:
         docker.from_env().ping()
-    except Exception:
+    except Exception:  # pylint: disable=broad-except
         return False
     return True
 

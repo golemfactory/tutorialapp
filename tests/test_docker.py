@@ -1,12 +1,10 @@
+# pylint: disable=unused-import, redefined-outer-name
 from pathlib import Path
 
 import docker
 import pytest
 
-from golem_task_api import (
-    TaskApiService,
-    constants as api_constants,
-)
+from golem_task_api import TaskApiService
 
 from tutorial_app import constants
 
@@ -22,7 +20,7 @@ from .docker import (
 
 @pytest.mark.skipif(not is_docker_available(), reason='docker not available')
 class TestDocker(SimulationBase):
-    IMAGE = f"{constants.DOCKER_IMAGE}:{constants.VERSION}"
+    IMAGE = f"{constants.DOCKER_IMAGE}:test"
 
     @classmethod
     def setup_class(cls):

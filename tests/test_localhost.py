@@ -1,3 +1,4 @@
+# pylint: disable=unused-import, redefined-outer-name
 from pathlib import Path
 
 import pytest
