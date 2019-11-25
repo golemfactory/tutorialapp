@@ -61,7 +61,7 @@ class RequestorHandler(api.RequestorAppHandler):
 
     async def run_benchmark(
             self,
-            task_work_dir: RequestorTaskDir,
+            work_dir: RequestorTaskDir,
     ) -> float:
         return await run_benchmark()
 
@@ -90,7 +90,7 @@ class ProviderHandler(api.ProviderAppHandler):
 
     async def run_benchmark(
             self,
-            task_work_dir: Path,
+            work_dir: Path,
     ) -> float:
         return await run_benchmark()
 
@@ -105,5 +105,5 @@ async def main():
 
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    LOOP = asyncio.get_event_loop()
+    LOOP.run_until_complete(main())

@@ -1,0 +1,4 @@
+mypy==0.670
+pycodestyle==2.5.0
+pyflakes==2.1.1
+pylint==1.9.2

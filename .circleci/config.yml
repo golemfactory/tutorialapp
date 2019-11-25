@@ -1,0 +1,51 @@
+version: 2
+jobs:
+   build:
+     machine: true
+     steps:
+       - checkout
+       - run:
+           name: Install Python3.6
+           command: |
+             sudo apt-get update
+             sudo apt-get install software-properties-common
+             sudo add-apt-repository -y ppa:deadsnakes/ppa
+             sudo apt-get update
+             sudo apt-get install python3.6 python3.6-dev python3.6-venv
+       - run:
+           name: Prepare venv with requirements
+           command: |
+             python3.6 -m venv .venv
+             . .venv/bin/activate
+             pip install -r requirements.txt -r requirements-lint.txt
+             pip install -r image/tutorial_app/requirements.txt
+       - run:
+           name: Check versions
+           command: |
+             . .venv/bin/activate
+             echo $PATH
+             python --version || echo "no python"
+             pip --version || echo "no pip"
+             docker --version || echo "no docker"
+       - run:
+           name: Build docker image
+           command: |
+             docker build --tag tutorialapp:1.0 image
+           no_output_timeout: 15m
+       - run:
+           name: Tests
+           command: |
+             . .venv/bin/activate
+             python -m pytest
+       - run:
+           name: pylint
+           command: |
+             pylint -rn image/tutorial_app/tutorial_app/
+       - run:
+           name: flake8
+           command: |
+             flake8 image/tutorial_app/tutorial_app/
+       - run:
+           name: mypy
+           command: |
+             mypy image/tutorial_app/tutorial_app/
