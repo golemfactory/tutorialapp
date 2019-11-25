@@ -55,6 +55,7 @@ enable=use-symbolic-message-instead,useless-supression,fixme
 disable=
     missing-docstring,
     too-few-public-methods,
+    invalid-name,
     # handled by black
     format
 

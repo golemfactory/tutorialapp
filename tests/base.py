@@ -1,3 +1,4 @@
+# pylint: disable=unused-import, redefined-outer-name
 import abc
 import asyncio
 
@@ -43,7 +44,7 @@ class SimulationBase(abc.ABC):
     def _check_results(
             req_task_outputs_dir: Path,
     ) -> None:
-        assert len(list(req_task_outputs_dir.iterdir())) > 0
+        assert list(req_task_outputs_dir.iterdir())
 
     async def _simulate_task(
             self,

@@ -28,9 +28,14 @@ jobs:
              pip --version || echo "no pip"
              docker --version || echo "no docker"
        - run:
+           name: Run setup.py develop
+           command: |
+             . .venv/bin/activate
+             cd image/tutorial_app/ && python setup.py develop && cd -
+       - run:
            name: Build docker image
            command: |
-             docker build --tag tutorialapp:1.0 image
+             docker build --tag tutorialapp:test image
            no_output_timeout: 15m
        - run:
            name: Tests
@@ -38,14 +43,9 @@ jobs:
              . .venv/bin/activate
              python -m pytest
        - run:
-           name: pylint
+           name: Linters
            command: |
+             . .venv/bin/activate
              pylint -rn image/tutorial_app/tutorial_app/
-       - run:
-           name: flake8
-           command: |
              flake8 image/tutorial_app/tutorial_app/
-       - run:
-           name: mypy
-           command: |
              mypy image/tutorial_app/tutorial_app/
