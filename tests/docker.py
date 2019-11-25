@@ -54,14 +54,17 @@ def get_docker_container_port_mapping(
 
     if sys.platform == 'darwin':
         ip_address = '127.0.0.1'
-    elif sys.platform == "win32":
-        vm_ip = subprocess.check_output(['docker-machine', 'ip', vm_name])
-        ip_address = vm_ip.decode('utf-8').strip()
+        port = int(net_config['Ports'][f'{port}/tcp'][0]['HostPort'])
+    elif sys.platform == 'win32':
+        ip_address = subprocess.check_output(['docker-machine', 'ip', vm_name])
+        ip_address = ip_address.decode('utf-8').strip()
+        port = int(net_config['Ports'][f'{port}/tcp'][0]['HostPort'])
     else:
         ip_address = net_config['Networks']['bridge']['IPAddress']
 
-    assert ip_address, "Unable to read the IP address"
-    port = int(net_config['Ports'][f'{port}/tcp'][0]['HostPort'])
+    if not ip_address:
+        raise RuntimeError(f'Unable to read the IP address of {container_id}')
+
     return ip_address, port
 
 
