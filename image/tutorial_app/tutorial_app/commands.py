@@ -17,10 +17,10 @@ from .task_manager import TaskManager, PREREQUISITES
 
 
 def _read_zip_contents(path: Path) -> str:
-    with zipfile.ZipFile(path, 'r') as f:
-        input_file = f.namelist()[0]
-        with f.open(input_file) as zf:
-            return zf.read().decode('utf-8')
+    with zipfile.ZipFile(path, 'r') as file:
+        input_file = file.namelist()[0]
+        with file.open(input_file) as inner_file:
+            return inner_file.read().decode('utf-8')
 
 
 async def create_task(
@@ -86,8 +86,8 @@ async def next_subtask(
 
     # write subtask input file
     subtask_input_file = work_dir.subtask_inputs_dir / f'{subtask_id}.zip'
-    with zipfile.ZipFile(subtask_input_file, 'w') as zf:
-        zf.writestr(subtask_id, part.input_data)
+    with zipfile.ZipFile(subtask_input_file, 'w') as file:
+        file.writestr(subtask_id, part.input_data)
 
     resources = [subtask_input_file.name]
     task_manager.start_subtask(part_num, subtask_id)
@@ -109,8 +109,8 @@ async def verify_subtask(
     subtask_outputs_dir = work_dir.subtask_outputs_dir(subtask_id)
     output_data = _read_zip_contents(subtask_outputs_dir / f'{subtask_id}.zip')
 
-    provider_result, provider_nonce = output_data.rsplit(' ', maxsplit=1)
-    provider_nonce = int(provider_nonce)
+    provider_result, provider_nonce_str = output_data.rsplit(' ', maxsplit=1)
+    provider_nonce = int(provider_nonce_str)
 
     # verify hash
     task_manager = TaskManager(work_dir)
@@ -131,7 +131,7 @@ async def verify_subtask(
             work_dir.task_outputs_dir / f'{subtask_id}.zip')
     except (AttributeError, ValueError) as err:
         task_manager.update_subtask_status(subtask_id, SubtaskStatus.FAILURE)
-        return VerifyResult.FAILURE, err.message
+        return VerifyResult.FAILURE, str(err)
 
     task_manager.update_subtask_status(subtask_id, SubtaskStatus.SUCCESS)
     return VerifyResult.SUCCESS, None
@@ -183,7 +183,7 @@ async def compute_subtask(
 
     # bundle computation output
     subtask_output_file = work_dir / f'{subtask_id}.zip'
-    with zipfile.ZipFile(subtask_output_file, 'w') as zf:
-        zf.writestr(subtask_id, f'{hash_result} {nonce}')
+    with zipfile.ZipFile(subtask_output_file, 'w') as file:
+        file.writestr(subtask_id, f'{hash_result} {nonce}')
 
     return subtask_output_file.name

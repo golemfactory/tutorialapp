@@ -42,7 +42,7 @@ def benchmark(
     for nonce in range(iterations):
         if api.threading.Executor.is_shutting_down():
             raise RuntimeError("Interrupted")
-        hash_result = _sha256('benchmark' + str(nonce))
+        _sha256('benchmark' + str(nonce))
     elapsed = time.time() - started
     if elapsed:
         return 1000. / elapsed
