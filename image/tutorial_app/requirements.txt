@@ -1,5 +1,5 @@
 --extra-index-url https://builds.golem.network
 peewee==3.11.2
-golem_task_api==0.24.1
+golem_task_api==0.25.0
 dataclasses==0.6; python_version < '3.7'
 async_generator; python_version < '3.7'
