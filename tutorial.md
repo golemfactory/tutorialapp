@@ -711,13 +711,13 @@ In this section we're going to build a Docker image with our application. Please
     RUN apt install -y python3-pip
     ```
 
-3. Copy the application.
+3. Copy application code.
 
     ```dockerfile
     COPY tutorial_app /golem/tutorial_app
     ```
 
-4. Install the required packages and app itself.
+4. Install required packages and the app itself.
 
     ```dockerfile
     RUN python3 -m pip install --no-cache-dir --upgrade pip
@@ -725,7 +725,7 @@ In this section we're going to build a Docker image with our application. Please
     RUN python3 -m pip install --no-cache-dir /golem/tutorial_app
     ```
 
-5. Clean up unnecessary packages.
+5. Clean up the no longer needed packages.
 
     ```dockerfile
     RUN apt remove -y python3-pip
@@ -755,10 +755,63 @@ TBD
 
 ## Publishing the application
 
-TBD
+In order to make your app available to others, you will need to:
 
-# `Golem-Task-Api` helper library features
+1. Upload the app image to Docker Hub
 
-## Application lifecycle
+    This short [tutorial](https://docs.docker.com/docker-hub/) will guide you through the process.
 
-TBD
+2. Create an app descriptor file and make it publicly available. The file has the following format:
+
+    ```json
+    {
+        "name": "repository/image_name",
+        "description": "My app",
+        "version": "1.0.0",
+        "author": "Me <me@company.org>, Others <others@company.org>",
+        "license": "GPLv3",
+        "requestor_env": "docker_cpu",
+        "requestor_prereq": {
+            "image": "repository/image_name",
+            "tag": "1.0.0"
+        },
+        "market_strategy": "brass",
+        "max_benchmark_score": 10000.0
+    }
+    ```
+
+    The app descriptor file is needed by requesting nodes and should be placed under `<golem_data_dir>/apps` directory.
+
+    `golem_data_dir` can be found at the following locations:
+
+    - macOS
+
+        `~/Library/Application Support/golem/default/<mainnet|rinkeby>`
+
+    - Linux
+
+        `~/.local/share/golem/default/<mainnet|rinkeby>`
+
+    - Windows
+
+        `%LOCALAPPDATA%\golem\golem\default\<mainnet|rinkeby>`
+
+3. Have both requestors and providers whitelist your image repository within Golem.
+
+    In order to manage a repository whitelist use the following CLI commands:
+
+    - `golemcli debug rpc env.docker.repos.whitelist`
+
+    To display all whitelisted repositories.
+
+    - `golemcli debug rpc env.docker.repos.whitelist.add <repository_name>`
+
+    Whitelist `<repository_name>`.
+
+    - `golemcli debug rpc env.docker.repos.whitelist.remove <repository_name>`
+
+    Remove the `<repository_name>` from your whitelist.
+
+    - `golemcli debug rpc env.docker.images.discovered`
+
+    List all app images seen by your node on the network.
