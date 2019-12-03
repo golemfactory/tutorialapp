@@ -494,6 +494,8 @@ Let's go through the commands, one by one.
 
 1. `create_task`
 
+    Returns a computation environment ID and prerequisites JSON, specifying the parameters needed to execute task computation.
+
     ```python
     async def create_task(
             work_dir: RequestorTaskDir,
@@ -508,39 +510,56 @@ Let's go through the commands, one by one.
         resources = task_params.get('resources')
         if not resources:
             raise ValueError(f"resources={resources}")
-        # read the input file
+        # read the input resource file, provided by the user (requestor)
         try:
             task_input_file = work_dir.task_inputs_dir / resources[0]
             input_data = task_input_file.read_text('utf-8')
         except (IOError, StopIteration) as exc:
             raise ValueError(f"Invalid resource file: {resources} ({exc})")
-        # create the task
+        # create the task within the task manager
         task_manager = TaskManager(work_dir)
         task_manager.create_task(max_part_count)
-        # update the parts with input data
+        # update the parts in the database with our input data
         for num in range(max_part_count):
             part = task_manager.get_part(num)
             part.input_data = input_data + str(uuid.uuid4())
             part.difficulty = difficulty + (difficulty % 2)
             part.save()
-
+        # return task's definition. We need to specify:
+        #   - the execution environment ID. Here: Docker CPU-only compute
+        #   - specify the Docker CPU environment prerequisites
+        #   - a minimum memory requirement in MiB
         return Task(
-            env_id=DOCKER_CPU_ENV_ID,
+            env_id=DOCKER_CPU_ENV_ID,  # 'docker_cpu'
             prerequisites=PREREQUISITES,
             inf_requirements=Infrastructure(min_memory_mib=50.))
     ```
 
+    Where `PREREQUISITES` tell us which Docker image providers should pull and execute:
+
+    ```python
+        PREREQUISITES = {
+            "image": 'golemfactory/tutorialapp',
+            "tag": "1.0",
+        }
+    ```
+
 2. `abort_task`
+
+    Will be called when the subtask is aborted by the user or timed out. Should stop verification of the subtask (if it's running) and perform any other necessary cleanup.
 
     ```python
     async def abort_task(
             work_dir: RequestorTaskDir,
     ) -> None:
         task_manager = TaskManager(work_dir)
+        # abort the task and currently running subtasks
         task_manager.abort_task()
     ```
 
 3. `abort_subtask`
+
+    Will be called when the subtask is aborted by the user or timed out.
 
    ```python
     async def abort_subtask(
@@ -548,10 +567,17 @@ Let's go through the commands, one by one.
             subtask_id: str
     ) -> None:
         task_manager = TaskManager(work_dir)
+        # abort a single subtask by changing its status to 'ABORTED';
+        # task manager will automatically handle the new status
         task_manager.update_subtask_status(subtask_id, SubtaskStatus.ABORTED)
    ```
 
 4. `next_subtask`
+
+    Returns subtask_params_json which is the JSON string containing subtask specific parameters.
+    Also returns resources which is a list of names of files required for computing the subtask. Files with these names are required to be present in `{task_id}/{constants.SUBTASK_INPUTS_DIR}` directory.
+
+    Can return an empty message meaning that the app refuses to assign a subtask to the provider node (for whatever reason).
 
     ```python
     async def next_subtask(
@@ -559,20 +585,25 @@ Let's go through the commands, one by one.
             subtask_id: str,
     ) -> Optional[api.structs.Subtask]:
         task_manager = TaskManager(work_dir)
-
+        # check whether we have any parts left for computation
         part_num = task_manager.get_next_computable_part_num()
         if part_num is None:
             return None
+        # get the part model from the database
         part = task_manager.get_part(part_num)
-
-        # write subtask input file
+        # write subtask input data file under a predefined directory
         subtask_input_file = work_dir.subtask_inputs_dir / f'{subtask_id}.zip'
         with zipfile.ZipFile(subtask_input_file, 'w') as zf:
             zf.writestr(subtask_id, part.input_data)
-
         resources = [subtask_input_file.name]
+        # bind the subtask to the part number and mark it as started
         task_manager.start_subtask(part_num, subtask_id)
-
+        # create subtask's definition. We need to specify:
+        #   - subtask parameters, which will be passed to providers as input
+        #     computation parameters
+        #   - a list of resources (file names) for providers to download and
+        #     use for the computation. Resource transfers are handled
+        #     automatically by Golem
         return api.structs.Subtask(
             params={
                 'difficulty': part.difficulty,
@@ -584,6 +615,8 @@ Let's go through the commands, one by one.
 
 5. `verify_subtask`
 
+    Called when computation results have been downloaded by Golem. For successfully verified subtasks it can also perform merging of the partial results into the final one.
+
     ```python
     async def verify_subtask(
             work_dir: RequestorTaskDir,
@@ -591,37 +624,42 @@ Let's go through the commands, one by one.
     ) -> Tuple[VerifyResult, Optional[str]]:
 
         subtask_outputs_dir = work_dir.subtask_outputs_dir(subtask_id)
+        # read contents of the subtask input data file
         output_data = _read_zip_contents(subtask_outputs_dir / f'{subtask_id}.zip')
-
+        # parse the read data as PoW computation result and nonce
         provider_result, provider_nonce = output_data.rsplit(' ', maxsplit=1)
         provider_nonce = int(provider_nonce)
-
-        # verify hash
+        # notify the task manager that the subtask is being verified
         task_manager = TaskManager(work_dir)
         task_manager.update_subtask_status(subtask_id, SubtaskStatus.VERIFYING)
 
         try:
+            # retrieve current part model from the database
             part_num = task_manager.get_part_num(subtask_id)
             part = task_manager.get_part(part_num)
-
+            # execute the verification function
             proof_of_work.verify(
                 part.input_data,
                 difficulty=part.difficulty,
                 against_result=provider_result,
                 against_nonce=provider_nonce)
-
-            shutil.copy(
-                subtask_outputs_dir / f'{subtask_id}.zip',
-                work_dir.task_outputs_dir / f'{subtask_id}.zip')
         except (AttributeError, ValueError) as err:
+            # verification has failed; update the status in the task manager
             task_manager.update_subtask_status(subtask_id, SubtaskStatus.FAILURE)
             return VerifyResult.FAILURE, err.message
-
+        # verification has succeeded
+        # copy results to the output directory, set by the requestor
+        shutil.copy(
+            subtask_outputs_dir / f'{subtask_id}.zip',
+            work_dir.task_outputs_dir / f'{subtask_id}.zip')
+        # update the status in the task manager
         task_manager.update_subtask_status(subtask_id, SubtaskStatus.SUCCESS)
         return VerifyResult.SUCCESS, None
     ```
 
 6. `discard_subtasks`
+
+    Should discard results of given subtasks and any dependent subtasks.
 
     ```python
     async def discard_subtasks(
@@ -629,12 +667,15 @@ Let's go through the commands, one by one.
             subtask_ids: List[str],
     ) -> List[str]:
         task_manager = TaskManager(work_dir)
+        # the PoW app simply aborts the subtasks in this case
         for subtask_id in subtask_ids:
             task_manager.update_subtask_status(subtask_id, SubtaskStatus.ABORTED)
         return subtask_ids
     ```
 
 7. `has_pending_subtasks`
+
+    Returns a boolean indicating whether there are any more pending subtasks waiting for computation at given moment.
 
     ```python
     async def has_pending_subtasks(
@@ -646,12 +687,17 @@ Let's go through the commands, one by one.
 
 8. `run_benchmark`
 
+    Returns a score which indicates how efficient the machine is for this type of tasks.
+
     ```python
     async def run_benchmark() -> float:
+        # execute the benchmark function in background and wait for the result
         return await api.threading.Executor.run(proof_of_work.benchmark)
     ```
 
 9. `compute_subtask`
+
+    Executes the computation.
 
     ```python
     async def compute_subtask(
@@ -659,29 +705,26 @@ Let's go through the commands, one by one.
             subtask_id: str,
             subtask_params: dict,
     ) -> Path:
-        # validate params
+        # validate subtask input parameters
         resources = subtask_params['resources']
         if not resources:
             raise ValueError(f"resources={resources}")
         difficulty = int(subtask_params['difficulty'])
         if difficulty < 0:
             raise ValueError(f"difficulty={difficulty}")
-
-        # read input data
+        # read the subtask input data from file, saved in a predefined directory
         subtask_input_file = work_dir.subtask_inputs_dir / resources[0]
         subtask_input = _read_zip_contents(subtask_input_file)
-
-        # execute computation
+        # execute computation in background and wait for the result
         hash_result, nonce = await api.threading.Executor.run(
             proof_of_work.compute,
             input_data=subtask_input,
             difficulty=difficulty)
-
-        # bundle computation output
+        # bundle computation output and save it in a predefined directory
         subtask_output_file = work_dir / f'{subtask_id}.zip'
         with zipfile.ZipFile(subtask_output_file, 'w') as zf:
             zf.writestr(subtask_id, f'{hash_result} {nonce}')
-
+        # return the name of our output file
         return subtask_output_file.name
     ```
 
