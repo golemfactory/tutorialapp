@@ -3,10 +3,12 @@ from pathlib import Path
 import peewee
 from golem_task_api.apputils.task import database
 
+from .constants import DOCKER_IMAGE, VERSION
+
 
 PREREQUISITES = {
-    "image": 'golemfactory/tutorialapp',
-    "tag": "1.0",
+    "image": DOCKER_IMAGE,
+    "tag": VERSION,
 }
 
 
