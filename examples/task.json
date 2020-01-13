@@ -1,0 +1,18 @@
+{
+    "golem": {
+        "app_id": "801964d531675a235c9ddcfda00075cb",
+        "name": "test task",
+        "resources": ["/home/golem/src/tutorialapp/examples/input.txt"],
+        "max_price_per_hour": "1000000000000000000",
+        "max_subtasks": 4,
+        "task_timeout": 180,
+        "subtask_timeout": 60,
+        "output_directory": "/home/golem/src/tutorialapp/examples/output"
+    },
+    "app": {
+        "difficulty": "1",
+        "resources": [
+            "input.txt"
+        ]
+    }
+}

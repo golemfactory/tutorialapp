@@ -1,0 +1,14 @@
+{
+        "name": "golemfactory/tutorialapp",
+        "description": "Golem task-api tutorial",
+        "version": "1.0.0",
+        "author": "Golem Team <contact@golem.network>",
+        "license": "GPLv3",
+        "requestor_env": "docker_cpu",
+        "requestor_prereq": {
+            "image": "golemfactory/tutorialapp",
+            "tag": "1.0.0"
+        },
+        "market_strategy": "brass",
+        "max_benchmark_score": 10000.0
+}

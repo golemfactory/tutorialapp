@@ -796,6 +796,115 @@ That's it!
 
 TBD
 
+## Running the application locally
+
+In this section we are going to run your application locally inside golem. Before we start make sure you have the prerequisites:
+1. Prepared docker image. `golemfactory/tutorialapp:1.0.0` in this example
+2. Working golem node from source
+
+### Check prepare docker image
+
+If you have followed this tutorial so far you should have a build docker image.
+```bash
+$ docker image golemfactory/tutorialapp
+REPOSITORY                 TAG                 IMAGE ID            CREATED             SIZE
+golemfactory/tutorialapp   1.0.0               <random_id>         <some time ago>     <not so large>
+```
+When you do not have this build yet go to the previous step of this guide.
+
+### Run the `basic_integration` test
+
+The easiest way to test your app is to run a `basic_integration` test, provided in the golem source files.
+In this example we will run the test on the `tutorialapp`.
+The required input files are available in the [`examples` on github](examples). Put both source folders next to each other to copy/paste the commands below.
+```
+../
+├── tutorialapp/
+└── golem/
+```
+
+1. Navigate to the golem source folder and enable your virtual env ( optional ), make sure golem is not running.
+2. Enable developer mode
+_TODO: add to `app_cfg.ini` so it is easy to enable_
+*workaround:* comment out `golem/envs/docker/cpu.py:589-592`
+```python
+                client.pull(
+                    prerequisites.image,
+                    tag=prerequisites.tag
+                )
+# becomes =>
+                #client.pull(
+                #    prerequisites.image,
+                #    tag=prerequisites.tag
+                #)
+```
+
+Now you are ready to test the app! Run the following commands:
+```bash
+pip install -r requirements.txt
+python scripts/task_api_tests/basic_integration.py task-from-app-def ../tutorialapp/examples/app_descriptor.json ../tutorialapp/examples/app_parameters.json --resources ../tutorialapp/examples/input.txt --max-subtasks=1
+```
+
+### Run the app on a local golem setup
+
+To run the tutorial app between your own nodes:
+- Add the app descriptor JSON file to your requestor's data-dir
+- Build the docker image on all nodes
+- Whitelist the image repository on both requestor and provider side.
+  _TODO: add task-api-dev config to not pull images and whitelist local images_
+- create a `task.json` file to request a task
+- Enter a private network ( optional, recommended to not have others pick up your task )
+- Create a task using the `golemcli`
+
+1. The app descriptor file is needed by requesting nodes and should be placed under `<golem_data_dir>/apps` directory.
+`golem_data_dir` can be found at the following locations:
+
+- macOS
+
+    `~/Library/Application Support/golem/default/<mainnet|rinkeby>`
+
+- Linux
+
+    `~/.local/share/golem/default/<mainnet|rinkeby>`
+
+- Windows
+
+    `%LOCALAPPDATA%\golem\golem\default\<mainnet|rinkeby>`
+1b. The first time you start golem the app is enabled by default, the second time you need to update the database to enable it ( TODO: make easier )
+Update your `golem.db` in the table `appconfig` app with ID `801964d531675a235c9ddcfda00075cb` should get enabled = 1
+2. check if you have [#prepare-docker-image|prepared the docker image] on all participating nodes.
+3. check if you have [#enable-developer-mode|enbled developer mode] on all participating nodes.
+3b. when using a image name not starting with `golemfactory/` you need to [#whitelist-repository|whitelist the repository].
+4. Create a `task.json` file with the following contents, make sure to update the paths to your setup:
+```json
+    {
+        "golem": {
+            "app_id": "801964d531675a235c9ddcfda00075cb",
+            "name": "test task",
+            "resources": ["/absolute/path/to/input.txt"],
+            "max_price_per_hour": "1000000000000000000",
+            "max_subtasks": 4,
+            "task_timeout": 180,
+            "subtask_timeout": 60,
+            "output_directory": "/absolute/path/to/output/directory"
+        },
+        "app": {
+            "difficulty": "1",
+            "resources": [
+                "tutorial-input.txt"
+            ]
+        }
+    }
+```
+5. (optional) Enter a private network by starting all golem nodes with the `protocol_id` option
+```bash
+golemapp --protocol_id=1337
+```
+6. Now you can can start the task using golemcli:
+```bash
+golemcli tasks create ./task.json
+```
+
 ## Publishing the application
 
 In order to make your app available to others, you will need to:
