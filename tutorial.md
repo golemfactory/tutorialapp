@@ -823,21 +823,7 @@ The required input files are available in the [`examples` on github](examples). 
 └── golem/
 ```
 
-1. Navigate to the golem source folder and enable your virtual env ( optional ), make sure golem is not running.
-2. Enable developer mode
-_TODO: add to `app_cfg.ini` so it is easy to enable_
-*workaround:* comment out `golem/envs/docker/cpu.py:589-592`
-```python
-                client.pull(
-                    prerequisites.image,
-                    tag=prerequisites.tag
-                )
-# becomes =>
-                #client.pull(
-                #    prerequisites.image,
-                #    tag=prerequisites.tag
-                #)
-```
+Navigate to the golem source folder and enable your virtual env ( optional ), make sure golem is not running.
 
 Now you are ready to test the app! Run the following commands:
 ```bash
@@ -850,10 +836,9 @@ python scripts/task_api_tests/basic_integration.py task-from-app-def ../tutorial
 To run the tutorial app between your own nodes:
 - Add the app descriptor JSON file to your requestor's data-dir
 - Build the docker image on all nodes
-- Whitelist the image repository on both requestor and provider side.
-  _TODO: add task-api-dev config to not pull images and whitelist local images_
 - create a `task.json` file to request a task
 - Enter a private network ( optional, recommended to not have others pick up your task )
+- Run golem with task-api developer mode enabled
 - Create a task using the `golemcli`
 
 1. The app descriptor file is needed by requesting nodes and should be placed under `<golem_data_dir>/apps` directory.
@@ -873,9 +858,7 @@ To run the tutorial app between your own nodes:
 1b. The first time you start golem the app is enabled by default, the second time you need to update the database to enable it ( TODO: make easier )
 Update your `golem.db` in the table `appconfig` app with ID `801964d531675a235c9ddcfda00075cb` should get enabled = 1
 2. check if you have [#prepare-docker-image|prepared the docker image] on all participating nodes.
-3. check if you have [#enable-developer-mode|enbled developer mode] on all participating nodes.
-3b. when using a image name not starting with `golemfactory/` you need to [#whitelist-repository|whitelist the repository].
-4. Create a `task.json` file with the following contents, make sure to update the paths to your setup:
+3. Create a `task.json` file with the following contents, make sure to update the paths to your setup:
 ```json
     {
         "golem": {
@@ -896,9 +879,13 @@ Update your `golem.db` in the table `appconfig` app with ID `801964d531675a235c9
         }
     }
 ```
-5. (optional) Enter a private network by starting all golem nodes with the `protocol_id` option
+4. (optional) Enter a private network by starting all golem nodes with the `protocol_id` option
 ```bash
 golemapp --protocol_id=1337
+```
+5. Start both golem nodes with the task-api developer mode enabled
+```bash
+golemapp --task-api-dev=1
 ```
 6. Now you can can start the task using golemcli:
 ```bash
