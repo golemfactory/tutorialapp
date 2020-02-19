@@ -785,7 +785,7 @@ In this section we're going to build a Docker image with our application. Please
 In order to build the image, execute the following command in the `image` directory:
 
 ```bash
-docker build -t tutorial_app -f Dockerfile .
+docker build -t golemfactory/tutorialapp:1.0.0 -f Dockerfile .
 ```
 
 That's it!
