@@ -14,7 +14,7 @@ This tutorial will guide you through the process of creating a sample Golem appl
 
 > Note: the `Golem-Task-Api` helper library is currently written in Python (3.6) and serves as a foundation for apps built in that language. The Rust and static binary versions of that library are currently on the roadmap.
 
-The `Tutorial-App` is a simple Proof of Work application. Golem tasks are initialized with a PoW difficulty parameter, set by the application user (requestor). After publishing the task in the network, Golem finds providers that are willing to participate in the computation. Each provider then computes a PoW with the set input difficulty and for different chunks of input data. The results will be sent back to the requestor and verified. For a more detailed description of task's lifecycle in the network, please refer to [this section](#application-lifecycle).
+The `Tutorial-App` is a simple Proof of Work application. Golem tasks are initialized with a PoW difficulty parameter, set by the application user (requestor). After publishing the task in the network, Golem finds providers that are willing to participate in the computation. Each provider then computes a PoW with the set input difficulty and for different chunks of input data. The results will be sent back to the requestor and verified..
 
 The `github` repository for the `Tutorial-App` can be found [here](https://github.com/golemfactory/tutorialapp).
 
@@ -37,7 +37,7 @@ The guide for creating `Tutorial-App` will cover the following aspects of Task A
 
 # Building the `Tutorial-App`
 
-The Task API library provides an out-of-the-box [gRPC](https://grpc.io) server compliant with the [API specification](https://github.com/golemfactory/task-api/README.md). The messages used for the API calls are specified in the [Protocol Buffers](https://developers.google.com/protocol-buffers) format. The Task API library hides these details from developers and provides a convenient way to implement application's logic.
+The Task API library provides an out-of-the-box [gRPC](https://grpc.io) server compliant with the [API specification](https://github.com/golemfactory/task-api/blob/master/README.md). The messages used for the API calls are specified in the [Protocol Buffers](https://developers.google.com/protocol-buffers) format. The Task API library hides these details from developers and provides a convenient way to implement application's logic.
 
 > The protocol and message definition files can be found [here](https://github.com/golemfactory/task-api/tree/master/golem_task_api/proto).
 
